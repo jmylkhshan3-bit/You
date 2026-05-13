@@ -1,0 +1,1302 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SkyStudio | Discord Server</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        /* ===== RESET & VARIABLES ===== */
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --black: #0a0a0a;
+            --dark: #111111;
+            --darker: #0d0d0d;
+            --red: #e63946;
+            --red-light: #ff4757;
+            --red-dark: #c1121f;
+            --red-glow: rgba(230,57,70,0.35);
+            --white: #ffffff;
+            --gray: #8a8a8a;
+            --gray-light: #b0b0b0;
+            --glass: rgba(255,255,255,0.03);
+            --glass-border: rgba(255,255,255,0.08);
+        }
+        html { scroll-behavior: smooth; scroll-snap-type: y mandatory; }
+        body {
+            font-family: 'Inter', 'Tajawal', sans-serif;
+            background: var(--black);
+            color: var(--white);
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+        [dir="rtl"] { font-family: 'Tajawal', 'Inter', sans-serif; }
+
+        /* ===== LOADING SCREEN ===== */
+        .loading-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--black); display: flex; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 9999;
+            transition: opacity 0.8s ease, visibility 0.8s ease;
+        }
+        .loading-screen.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+        .loading-logo {
+            width: 140px; height: 140px; border-radius: 32px; overflow: hidden;
+            margin-bottom: 30px; position: relative;
+            box-shadow: 0 0 40px var(--red-glow), 0 0 80px rgba(230,57,70,0.15);
+            animation: logoPulse 2s ease-in-out infinite;
+        }
+        .loading-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .loading-logo::after {
+            content: ''; position: absolute; inset: 0;
+            background: repeating-linear-gradient(-45deg, transparent, transparent 10px, rgba(255,255,255,0.06) 10px, rgba(255,255,255,0.06) 20px);
+            animation: stripeScroll 3s linear infinite;
+            pointer-events: none;
+        }
+        @keyframes logoPulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 30px rgba(230,57,70,0.3); }
+            50% { transform: scale(1.05); box-shadow: 0 0 70px rgba(230,57,70,0.6), 0 0 120px rgba(230,57,70,0.2); }
+        }
+        @keyframes stripeScroll { 0% { background-position: 0 0; } 100% { background-position: 56px 56px; } }
+        .loading-text {
+            font-size: 1.4rem; font-weight: 300; letter-spacing: 0.4em;
+            text-transform: uppercase; color: var(--gray); margin-bottom: 24px;
+        }
+        .loading-bar-wrap { width: 260px; height: 3px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; }
+        .loading-bar {
+            height: 100%; width: 0%;
+            background: linear-gradient(90deg, var(--red-dark), var(--red), var(--red-light), var(--red));
+            background-size: 200% 100%;
+            border-radius: 3px;
+            animation: loadBar 2.5s ease-in-out forwards, shimmerBar 1.5s linear infinite;
+        }
+        @keyframes loadBar { 0% { width: 0%; } 60% { width: 75%; } 100% { width: 100%; } }
+        @keyframes shimmerBar { 0% { background-position: 0% 0%; } 100% { background-position: 200% 0%; } }
+        .loading-dots { display: flex; gap: 10px; margin-top: 22px; }
+        .loading-dots span {
+            width: 10px; height: 10px; background: var(--red); border-radius: 50%;
+            animation: dotBounce 1.4s ease-in-out infinite; opacity: 0.3;
+        }
+        .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes dotBounce { 0%,80%,100% { transform: scale(0.6); opacity: 0.3; } 40% { transform: scale(1.2); opacity: 1; } }
+
+        /* ===== THREE.JS CANVAS ===== */
+        #three-canvas {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 0; pointer-events: none;
+        }
+
+        /* ===== NAVBAR ===== */
+        .navbar {
+            position: fixed; top: 0; left: 0; width: 100%; padding: 18px 48px;
+            display: flex; justify-content: space-between; align-items: center; z-index: 1000;
+            background: rgba(10,10,10,0.75); backdrop-filter: blur(20px) saturate(1.5);
+            border-bottom: 1px solid var(--glass-border); transition: all 0.3s ease;
+        }
+        .navbar.scrolled { padding: 13px 48px; background: rgba(10,10,10,0.96); }
+        .nav-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+        .nav-logo-icon {
+            width: 44px; height: 44px; border-radius: 11px; overflow: hidden;
+            box-shadow: 0 0 15px rgba(230,57,70,0.35); flex-shrink: 0;
+        }
+        .nav-logo-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .nav-logo-text { font-size: 1.35rem; font-weight: 800; color: var(--white); letter-spacing: -0.02em; }
+        .nav-logo-text em { color: var(--red); font-style: normal; }
+        .nav-links { display: flex; gap: 4px; list-style: none; align-items: center; }
+        .nav-links a {
+            color: var(--gray); text-decoration: none; font-size: 0.88rem; font-weight: 500;
+            padding: 8px 15px; border-radius: 8px; transition: all 0.25s ease;
+        }
+        .nav-links a:hover { color: var(--white); background: var(--glass); }
+        .nav-links a.active { color: var(--red); background: rgba(230,57,70,0.1); }
+        .nav-right { display: flex; align-items: center; gap: 16px; }
+        .lang-switch { display: flex; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 3px; }
+        .lang-btn {
+            background: none; border: none; color: var(--gray); padding: 6px 13px;
+            border-radius: 6px; cursor: pointer; font-size: 0.82rem; font-weight: 700;
+            transition: all 0.25s ease; font-family: inherit; letter-spacing: 0.05em;
+        }
+        .lang-btn.active { background: var(--red); color: var(--white); box-shadow: 0 2px 10px rgba(230,57,70,0.4); }
+        .lang-btn:hover:not(.active) { color: var(--white); }
+
+        /* ===== SCROLL INDICATOR ===== */
+        .scroll-indicator {
+            position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+            display: flex; flex-direction: column; align-items: center; gap: 8px;
+            color: var(--gray); font-size: 0.78rem; z-index: 100;
+            animation: scrollBounce 2s ease-in-out infinite; opacity: 0.7;
+            transition: opacity 0.5s ease; pointer-events: none; letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+        @keyframes scrollBounce {
+            0%,100% { transform: translateX(-50%) translateY(0); }
+            50% { transform: translateX(-50%) translateY(-8px); }
+        }
+
+        /* ===== PAGE DOTS ===== */
+        .page-dots {
+            position: fixed; right: 28px; top: 50%; transform: translateY(-50%);
+            display: flex; flex-direction: column; gap: 12px; z-index: 100;
+        }
+        [dir="rtl"] .page-dots { right: auto; left: 28px; }
+        .page-dot {
+            width: 9px; height: 9px; border-radius: 50%;
+            background: rgba(255,255,255,0.2); cursor: pointer;
+            transition: all 0.3s ease; position: relative;
+        }
+        .page-dot.active { background: var(--red); box-shadow: 0 0 14px var(--red-glow); transform: scale(1.4); }
+        .page-dot:hover { background: var(--red-light); }
+        .page-dot::after {
+            content: attr(data-label); position: absolute; right: 22px; top: 50%;
+            transform: translateY(-50%); font-size: 0.73rem; color: var(--gray);
+            white-space: nowrap; opacity: 0; transition: opacity 0.2s ease; pointer-events: none;
+            background: rgba(10,10,10,0.9); padding: 3px 8px; border-radius: 5px;
+        }
+        [dir="rtl"] .page-dot::after { right: auto; left: 22px; }
+        .page-dot:hover::after { opacity: 1; }
+
+        /* ===== SECTIONS ===== */
+        .section {
+            min-height: 100vh; width: 100%;
+            display: flex; align-items: center; justify-content: center;
+            position: relative; scroll-snap-align: start;
+            padding: 100px 48px 60px; overflow: hidden; z-index: 2;
+        }
+
+        /* ===== HERO ===== */
+        .hero-section {
+            background: linear-gradient(135deg, rgba(10,10,10,0.9) 0%, rgba(15,15,15,0.92) 50%, rgba(10,10,10,0.9) 100%);
+        }
+        .hero-content { text-align: center; max-width: 900px; z-index: 10; position: relative; }
+
+        /* 3D Floating Server Icon */
+        .hero-3d-wrapper {
+            width: 200px; height: 200px; margin: 0 auto 48px;
+            position: relative; transform-style: preserve-3d;
+            perspective: 800px;
+        }
+        .hero-3d-icon {
+            width: 100%; height: 100%; border-radius: 44px; overflow: hidden;
+            position: relative;
+            box-shadow: 0 20px 60px rgba(230,57,70,0.4), 0 0 100px rgba(230,57,70,0.2), inset 0 0 40px rgba(230,57,70,0.1);
+            border: 2px solid rgba(230,57,70,0.5);
+            animation: iconFloat 7s ease-in-out infinite;
+            will-change: transform;
+        }
+        .hero-3d-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .hero-3d-icon::after {
+            content: ''; position: absolute; inset: 0; pointer-events: none;
+            background: repeating-linear-gradient(-45deg, transparent, transparent 8px, rgba(255,255,255,0.07) 8px, rgba(255,255,255,0.07) 16px);
+            animation: stripeScroll 4s linear infinite;
+        }
+        .hero-icon-shadow {
+            position: absolute; bottom: -32px; left: 50%; transform: translateX(-50%);
+            width: 150px; height: 22px;
+            background: radial-gradient(ellipse, rgba(230,57,70,0.5) 0%, transparent 70%);
+            filter: blur(12px);
+            animation: shadowFloat 7s ease-in-out infinite;
+        }
+        @keyframes iconFloat {
+            0%   { transform: translateY(0px) rotateX(0deg) rotateY(0deg); }
+            20%  { transform: translateY(-18px) rotateX(4deg) rotateY(5deg); }
+            40%  { transform: translateY(-10px) rotateX(-2deg) rotateY(2deg); }
+            60%  { transform: translateY(-22px) rotateX(3deg) rotateY(-6deg); }
+            80%  { transform: translateY(-8px) rotateX(-3deg) rotateY(3deg); }
+            100% { transform: translateY(0px) rotateX(0deg) rotateY(0deg); }
+        }
+        @keyframes shadowFloat {
+            0%,100% { transform: translateX(-50%) scale(1); opacity: 0.5; }
+            50%      { transform: translateX(-50%) scale(1.3); opacity: 0.2; }
+        }
+
+        .hero-badge {
+            display: inline-flex; align-items: center; gap: 9px;
+            background: rgba(230,57,70,0.12); border: 1px solid rgba(230,57,70,0.3);
+            padding: 8px 22px; border-radius: 50px;
+            font-size: 0.85rem; font-weight: 600; color: var(--red-light); margin-bottom: 28px;
+            animation: fadeUp 0.8s ease forwards;
+        }
+        .badge-pulse {
+            width: 8px; height: 8px; background: #3ba55d; border-radius: 50%;
+            box-shadow: 0 0 8px #3ba55d;
+            animation: pulseDot 2s ease-in-out infinite;
+        }
+        @keyframes pulseDot { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.3); } }
+
+        .hero-title {
+            font-size: clamp(2.8rem, 6vw, 5.2rem); font-weight: 900;
+            line-height: 1.1; margin-bottom: 22px;
+            animation: fadeUp 0.8s ease 0.15s forwards; opacity: 0;
+        }
+        .hero-title .grad-text {
+            background: linear-gradient(135deg, var(--red) 0%, var(--red-light) 50%, #ff8a95 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+            filter: drop-shadow(0 0 30px rgba(230,57,70,0.4));
+            display: inline-block;
+        }
+        .hero-subtitle {
+            font-size: clamp(1rem, 2vw, 1.25rem); color: var(--gray);
+            font-weight: 300; line-height: 1.75; margin-bottom: 40px;
+            max-width: 620px; margin-left: auto; margin-right: auto;
+            animation: fadeUp 0.8s ease 0.3s forwards; opacity: 0;
+        }
+        .hero-stats {
+            display: flex; justify-content: center; gap: 48px; margin-bottom: 42px;
+            animation: fadeUp 0.8s ease 0.45s forwards; opacity: 0;
+        }
+        .stat-item { text-align: center; position: relative; }
+        .stat-item::after {
+            content: ''; position: absolute; right: -24px; top: 50%;
+            transform: translateY(-50%); width: 1px; height: 44px;
+            background: linear-gradient(180deg, transparent, rgba(255,255,255,0.12), transparent);
+        }
+        [dir="rtl"] .stat-item::after { right: auto; left: -24px; }
+        .stat-item:last-child::after { display: none; }
+        .stat-number {
+            font-size: 2.8rem; font-weight: 900; color: var(--red); line-height: 1;
+            text-shadow: 0 0 24px rgba(230,57,70,0.4); letter-spacing: -0.02em;
+        }
+        .stat-label { font-size: 0.8rem; color: var(--gray); margin-top: 6px; text-transform: uppercase; letter-spacing: 0.12em; }
+        .hero-cta {
+            display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;
+            animation: fadeUp 0.8s ease 0.6s forwards; opacity: 0;
+        }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex; align-items: center; gap: 10px;
+            padding: 15px 34px; border-radius: 12px; font-size: 0.97rem;
+            font-weight: 600; text-decoration: none; transition: all 0.3s ease;
+            cursor: pointer; border: none; font-family: inherit;
+            position: relative; overflow: hidden;
+        }
+        .btn::before {
+            content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent);
+            transition: left 0.55s ease;
+        }
+        .btn:hover::before { left: 100%; }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--red), var(--red-dark));
+            color: var(--white); box-shadow: 0 8px 28px rgba(230,57,70,0.35);
+        }
+        .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 16px 40px rgba(230,57,70,0.55); }
+        .btn-secondary {
+            background: rgba(255,255,255,0.04); color: var(--white);
+            border: 1px solid var(--glass-border); backdrop-filter: blur(12px);
+        }
+        .btn-secondary:hover { background: rgba(255,255,255,0.09); border-color: rgba(255,255,255,0.22); transform: translateY(-3px); }
+
+        /* ===== FLOATING 3D ELEMENTS ===== */
+        .float-el {
+            position: absolute; width: 58px; height: 58px;
+            background: rgba(230,57,70,0.08); border: 1px solid rgba(230,57,70,0.2);
+            border-radius: 16px; display: flex; align-items: center; justify-content: center;
+            font-size: 1.4rem; color: var(--red); backdrop-filter: blur(4px);
+            animation: floatEl 9s ease-in-out infinite;
+            transform-style: preserve-3d; pointer-events: none;
+        }
+        .float-el:nth-child(1) { top: 22%; left: 8%; animation-delay: 0s; }
+        .float-el:nth-child(2) { top: 58%; right: 12%; animation-delay: 2.2s; }
+        .float-el:nth-child(3) { bottom: 22%; left: 18%; animation-delay: 4.4s; }
+        .float-el:nth-child(4) { top: 32%; right: 8%; animation-delay: 1.1s; }
+        @keyframes floatEl {
+            0%,100% { transform: translateY(0) rotateX(0deg) rotateY(0deg) rotateZ(0deg); }
+            25%      { transform: translateY(-28px) rotateX(12deg) rotateY(10deg) rotateZ(5deg); }
+            50%      { transform: translateY(-14px) rotateX(-6deg) rotateY(18deg) rotateZ(-3deg); }
+            75%      { transform: translateY(-22px) rotateX(8deg) rotateY(-12deg) rotateZ(6deg); }
+        }
+
+        /* ===== CAROUSEL SECTION ===== */
+        .carousel-section { background: var(--darker); perspective: 1400px; }
+        .carousel-wrap {
+            width: 100%; max-width: 1200px; height: 72vh;
+            display: flex; align-items: center; justify-content: center;
+            position: relative; transform-style: preserve-3d;
+        }
+        .carousel-stage {
+            position: relative; width: 300px; height: 400px;
+            transform-style: preserve-3d;
+            animation: stageSpin 26s linear infinite;
+        }
+        .carousel-stage:hover { animation-play-state: paused; }
+        @keyframes stageSpin { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(360deg); } }
+        .c-card {
+            position: absolute; width: 260px; height: 360px;
+            left: 20px; top: 20px; border-radius: 22px;
+            background: rgba(255,255,255,0.025);
+            backdrop-filter: blur(18px);
+            border: 1px solid rgba(255,255,255,0.06);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(230,57,70,0.07);
+            cursor: pointer; transition: box-shadow 0.4s ease, border-color 0.4s ease;
+            transform-style: preserve-3d; overflow: hidden;
+        }
+        .c-card::before {
+            content: ''; position: absolute; inset: 0; border-radius: inherit;
+            background: linear-gradient(135deg, rgba(230,57,70,0.06) 0%, transparent 60%);
+            pointer-events: none;
+        }
+        .c-card:hover { box-shadow: 0 30px 80px rgba(0,0,0,0.7), 0 0 60px rgba(230,57,70,0.25); border-color: rgba(230,57,70,0.4); }
+        .c-card-inner {
+            width: 100%; height: 100%; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; padding: 32px; text-align: center;
+            position: relative; z-index: 1;
+        }
+        .c-icon {
+            font-size: 3.5rem; margin-bottom: 22px; color: var(--red);
+            filter: drop-shadow(0 0 18px rgba(230,57,70,0.5));
+        }
+        .c-title { font-size: 1.35rem; font-weight: 700; color: var(--white); margin-bottom: 10px; }
+        .c-desc { font-size: 0.88rem; color: var(--gray); line-height: 1.6; }
+        .c-badge {
+            position: absolute; top: 14px; right: 14px;
+            background: var(--red); color: var(--white);
+            padding: 4px 11px; border-radius: 20px; font-size: 0.72rem; font-weight: 700;
+            letter-spacing: 0.05em;
+            animation: badgePop 2s ease-in-out infinite;
+        }
+        @keyframes badgePop { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+        .carousel-title {
+            position: absolute; top: 40px; left: 50%; transform: translateX(-50%);
+            font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.2em;
+            color: var(--gray); white-space: nowrap; pointer-events: none;
+        }
+
+        /* ===== ABOUT SECTION ===== */
+        .about-section { background: var(--black); }
+        .about-inner {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 70px; max-width: 1200px; width: 100%; align-items: center;
+        }
+        .about-visual { perspective: 1200px; }
+        .about-img-wrap {
+            width: 100%; aspect-ratio: 1; border-radius: 32px; overflow: hidden;
+            box-shadow: 0 30px 80px rgba(230,57,70,0.25), 0 0 60px rgba(230,57,70,0.1);
+            transform: rotateY(-12deg) rotateX(6deg); transition: transform 0.7s ease;
+            position: relative;
+        }
+        .about-visual:hover .about-img-wrap { transform: rotateY(0deg) rotateX(0deg) scale(1.02); }
+        .about-img-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .about-img-wrap::after {
+            content: ''; position: absolute; inset: 0; pointer-events: none;
+            background: repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(255,255,255,0.04) 15px, rgba(255,255,255,0.04) 30px);
+            animation: stripeScroll 5s linear infinite;
+        }
+        .about-text { }
+        .about-text h2 { font-size: clamp(2rem, 4vw, 3rem); font-weight: 800; margin-bottom: 20px; line-height: 1.2; }
+        .about-text h2 .red { color: var(--red); }
+        .about-text p { font-size: 1.05rem; color: var(--gray); line-height: 1.85; margin-bottom: 18px; }
+        .about-feats { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; margin-top: 28px; }
+        .about-feat {
+            display: flex; align-items: center; gap: 11px; padding: 12px 16px;
+            background: var(--glass); border: 1px solid var(--glass-border); border-radius: 10px;
+            font-size: 0.88rem; color: var(--gray-light); transition: all 0.3s ease;
+        }
+        .about-feat i { color: var(--red); font-size: 0.95rem; flex-shrink: 0; }
+        .about-feat:hover { border-color: rgba(230,57,70,0.3); background: rgba(230,57,70,0.05); transform: translateX(5px); }
+        [dir="rtl"] .about-feat:hover { transform: translateX(-5px); }
+
+        /* ===== SECTION HEADER ===== */
+        .section-hdr { text-align: center; margin-bottom: 60px; }
+        .section-hdr h2 { font-size: clamp(2rem, 4vw, 3rem); font-weight: 800; margin-bottom: 14px; }
+        .section-hdr h2 .red { color: var(--red); }
+        .section-hdr p { font-size: 1.05rem; color: var(--gray); max-width: 600px; margin: 0 auto; line-height: 1.7; }
+
+        /* ===== GAMES SECTION ===== */
+        .games-section { background: var(--darker); }
+        .games-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; max-width: 1200px; width: 100%; }
+        .game-card {
+            background: var(--glass); border: 1px solid var(--glass-border);
+            border-radius: 20px; padding: 30px; transition: border-color 0.4s ease;
+            position: relative; overflow: hidden;
+            transform-style: preserve-3d; cursor: default;
+            will-change: transform;
+        }
+        .game-card::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 3px;
+            background: linear-gradient(90deg, var(--red-dark), var(--red-light));
+            transform: scaleX(0); transform-origin: left; transition: transform 0.4s ease;
+        }
+        .game-card:hover::before { transform: scaleX(1); }
+        .game-card:hover { border-color: rgba(230,57,70,0.25); }
+        .game-icon {
+            width: 58px; height: 58px; background: rgba(230,57,70,0.1); border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.7rem; color: var(--red); margin-bottom: 20px; transition: all 0.3s ease;
+        }
+        .game-card:hover .game-icon { transform: scale(1.12) rotate(-5deg); background: rgba(230,57,70,0.2); }
+        .game-card h3 { font-size: 1.25rem; font-weight: 700; margin-bottom: 10px; }
+        .game-card p { font-size: 0.88rem; color: var(--gray); line-height: 1.65; }
+        .game-tags { display: flex; gap: 7px; margin-top: 15px; flex-wrap: wrap; }
+        .tag { background: rgba(230,57,70,0.1); color: var(--red-light); padding: 4px 11px; border-radius: 20px; font-size: 0.74rem; font-weight: 600; }
+
+        /* ===== COMMUNITY SECTION ===== */
+        .community-section { background: var(--black); }
+        .comm-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; width: 100%; }
+        .comm-card {
+            background: var(--glass); border: 1px solid var(--glass-border);
+            border-radius: 22px; padding: 40px 30px; text-align: center;
+            transition: all 0.4s ease; position: relative; overflow: hidden;
+            transform-style: preserve-3d; cursor: default; will-change: transform;
+        }
+        .comm-card::before {
+            content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+            background: radial-gradient(circle, rgba(230,57,70,0.1) 0%, transparent 65%);
+            opacity: 0; transition: opacity 0.4s ease;
+        }
+        .comm-card:hover::before { opacity: 1; }
+        .comm-card:hover { border-color: rgba(230,57,70,0.25); transform: translateY(-6px); box-shadow: 0 18px 50px rgba(0,0,0,0.3); }
+        .comm-num { font-size: 3.8rem; font-weight: 900; color: var(--red); line-height: 1; margin-bottom: 10px; text-shadow: 0 0 30px rgba(230,57,70,0.35); }
+        .comm-lbl { font-size: 1rem; color: var(--gray); font-weight: 500; }
+        .comm-ico { font-size: 2rem; color: var(--red); margin-bottom: 14px; opacity: 0.75; }
+
+        /* ===== DEV SECTION ===== */
+        .dev-section { background: var(--darker); }
+        .dev-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 24px; max-width: 1200px; width: 100%; }
+        .dev-card {
+            background: var(--glass); border: 1px solid var(--glass-border);
+            border-radius: 20px; padding: 34px; transition: border-color 0.4s ease;
+            position: relative; overflow: hidden;
+            transform-style: preserve-3d; cursor: default; will-change: transform;
+        }
+        .dev-card::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 3px; height: 100%;
+            background: linear-gradient(180deg, var(--red-dark), var(--red-light));
+            transform: scaleY(0); transform-origin: top; transition: transform 0.4s ease;
+        }
+        .dev-card:hover::before { transform: scaleY(1); }
+        .dev-card:hover { border-color: rgba(230,57,70,0.25); }
+        .dev-header { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+        .dev-avatar {
+            width: 50px; height: 50px;
+            background: linear-gradient(135deg, var(--red), var(--red-dark));
+            border-radius: 13px; display: flex; align-items: center; justify-content: center;
+            font-size: 1.3rem; color: var(--white); flex-shrink: 0;
+        }
+        .dev-info h4 { font-size: 1.1rem; font-weight: 700; }
+        .dev-info span { font-size: 0.83rem; color: var(--red); font-weight: 600; }
+        .dev-card > p { font-size: 0.88rem; color: var(--gray); line-height: 1.7; }
+        .dev-skills { display: flex; gap: 7px; margin-top: 14px; flex-wrap: wrap; }
+        .skill-tag {
+            background: rgba(255,255,255,0.05); color: var(--gray-light);
+            padding: 4px 10px; border-radius: 6px; font-size: 0.74rem; font-weight: 500;
+            transition: all 0.25s ease;
+        }
+        .skill-tag:hover { background: rgba(230,57,70,0.18); color: var(--red-light); }
+
+        /* ===== JOIN SECTION ===== */
+        .join-section {
+            background: linear-gradient(135deg, var(--black) 0%, var(--dark) 50%, var(--black) 100%);
+        }
+        .join-section::before {
+            content: ''; position: absolute; inset: 0; pointer-events: none;
+            background: radial-gradient(ellipse at center, rgba(230,57,70,0.12) 0%, transparent 65%);
+        }
+        .join-content { text-align: center; max-width: 700px; z-index: 10; position: relative; }
+        .join-badge {
+            display: inline-flex; align-items: center; gap: 9px;
+            background: rgba(230,57,70,0.12); border: 1px solid rgba(230,57,70,0.3);
+            padding: 8px 22px; border-radius: 50px;
+            font-size: 0.85rem; font-weight: 600; color: var(--red-light); margin-bottom: 28px;
+        }
+        .join-title { font-size: clamp(2.4rem, 5vw, 4rem); font-weight: 900; margin-bottom: 20px; line-height: 1.2; }
+        .join-title .red { color: var(--red); }
+        .join-sub { font-size: 1.05rem; color: var(--gray); margin-bottom: 42px; line-height: 1.75; }
+
+        /* Discord Card */
+        .discord-card {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 24px;
+            overflow: hidden; width: 380px; max-width: 90vw;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+            transition: all 0.45s ease; transform-style: preserve-3d;
+            display: inline-block;
+        }
+        .discord-card:hover {
+            transform: translateY(-6px) rotateX(6deg);
+            box-shadow: 0 32px 70px rgba(0,0,0,0.6), 0 0 50px rgba(230,57,70,0.18);
+        }
+        .dc-banner { height: 140px; position: relative; overflow: hidden; background: linear-gradient(135deg, #e8404e 0%, #f06b72 50%, #e84a55 100%); }
+        .dc-banner::after {
+            content: ''; position: absolute; inset: 0; pointer-events: none;
+            background: repeating-linear-gradient(-45deg, transparent, transparent 12px, rgba(255,255,255,0.05) 12px, rgba(255,255,255,0.05) 24px);
+        }
+        .dc-body { padding: 0 24px 24px; }
+        .dc-icon-wrap {
+            width: 88px; height: 88px; border-radius: 22px; overflow: hidden;
+            margin-top: -44px; position: relative; z-index: 2;
+            border: 4px solid #1a1a2e;
+            box-shadow: 0 8px 28px rgba(230,57,70,0.3);
+        }
+        .dc-icon-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .dc-name { font-size: 1.5rem; font-weight: 800; color: var(--white); margin-top: 14px; margin-bottom: 4px; }
+        .dc-verified { display: inline-flex; align-items: center; gap: 6px; color: var(--gray); font-size: 0.84rem; margin-bottom: 14px; }
+        .dc-verified i { color: #3ba55d; }
+        .dc-stats { display: flex; gap: 20px; margin-bottom: 18px; }
+        .dc-stat { display: flex; align-items: center; gap: 7px; font-size: 0.88rem; color: var(--gray); }
+        .dot-green { width: 8px; height: 8px; border-radius: 50%; background: #3ba55d; box-shadow: 0 0 6px #3ba55d; flex-shrink: 0; }
+        .dot-gray  { width: 8px; height: 8px; border-radius: 50%; background: var(--gray); flex-shrink: 0; }
+        .dc-est { font-size: 0.83rem; color: var(--gray); margin-bottom: 18px; }
+        .dc-join {
+            width: 100%; padding: 15px; background: #3ba55d; color: var(--white);
+            border: none; border-radius: 12px; font-size: 1.05rem; font-weight: 700;
+            cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center;
+            justify-content: center; gap: 10px; font-family: inherit;
+            text-decoration: none; position: relative; overflow: hidden;
+        }
+        .dc-join::before {
+            content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent);
+            transition: left 0.55s ease;
+        }
+        .dc-join:hover::before { left: 100%; }
+        .dc-join:hover { background: #2a9a52; transform: translateY(-2px); box-shadow: 0 10px 30px rgba(59,165,93,0.35); }
+
+        /* ===== FOOTER ===== */
+        .footer {
+            background: var(--darker); padding: 44px;
+            text-align: center; border-top: 1px solid var(--glass-border);
+            position: relative; z-index: 2;
+        }
+        .footer-logo { font-size: 1.5rem; font-weight: 800; margin-bottom: 14px; }
+        .footer-logo em { color: var(--red); font-style: normal; }
+        .footer-text { color: var(--gray); font-size: 0.88rem; margin-bottom: 20px; }
+        .footer-socials { display: flex; justify-content: center; gap: 12px; }
+        .footer-socials a {
+            width: 42px; height: 42px; background: var(--glass);
+            border: 1px solid var(--glass-border); border-radius: 11px;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--gray); text-decoration: none; transition: all 0.3s ease;
+        }
+        .footer-socials a:hover { background: var(--red); color: var(--white); border-color: var(--red); transform: translateY(-3px) rotate(5deg); }
+
+        /* ===== SCROLL ANIMATIONS ===== */
+        .fade-up { opacity: 0; transform: translateY(30px); transition: opacity 0.75s ease, transform 0.75s ease; }
+        .fade-up.visible { opacity: 1; transform: translateY(0); }
+        .slide-left { opacity: 0; transform: translateX(-48px); transition: opacity 0.75s ease, transform 0.75s ease; }
+        .slide-left.visible { opacity: 1; transform: translateX(0); }
+        .slide-right { opacity: 0; transform: translateX(48px); transition: opacity 0.75s ease, transform 0.75s ease; }
+        .slide-right.visible { opacity: 1; transform: translateX(0); }
+        .scale-up { opacity: 0; transform: scale(0.82); transition: opacity 0.75s ease, transform 0.75s ease; }
+        .scale-up.visible { opacity: 1; transform: scale(1); }
+        .delay-1 { transition-delay: 0.1s; }
+        .delay-2 { transition-delay: 0.2s; }
+        .delay-3 { transition-delay: 0.3s; }
+
+        /* ===== RTL OVERRIDES ===== */
+        [dir="rtl"] .hero-cta { flex-direction: row-reverse; }
+        [dir="rtl"] .about-feats { direction: rtl; }
+        [dir="rtl"] .dev-header { flex-direction: row; }
+        [dir="rtl"] .about-inner { direction: rtl; }
+        [dir="rtl"] .stat-item::after { right: auto; left: -24px; }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 900px) {
+            .about-inner { grid-template-columns: 1fr; gap: 44px; }
+            .comm-grid { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 700px) {
+            .navbar { padding: 14px 20px; }
+            .nav-links { display: none; }
+            .section { padding: 80px 20px 48px; }
+            .hero-stats { gap: 22px; }
+            .stat-number { font-size: 2.1rem; }
+            .comm-grid { grid-template-columns: 1fr; }
+            .hero-3d-wrapper { width: 150px; height: 150px; }
+            .float-el { display: none; }
+            .page-dots { display: none; }
+            .discord-card { width: 100%; }
+            .navbar { padding: 14px 20px; }
+            .carousel-section { display: none; }
+        }
+        @media (max-width: 480px) {
+            .hero-title { font-size: 2.4rem; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ===== LOADING SCREEN ===== -->
+<div class="loading-screen" id="loadingScreen">
+    <div class="loading-logo">
+        <img src="skystudio_icon.png" alt="SkyStudio">
+    </div>
+    <div class="loading-text" id="loadText">Loading SkyStudio...</div>
+    <div class="loading-bar-wrap"><div class="loading-bar"></div></div>
+    <div class="loading-dots"><span></span><span></span><span></span></div>
+</div>
+
+<!-- ===== THREE.JS CANVAS ===== -->
+<canvas id="three-canvas"></canvas>
+
+<!-- ===== NAVBAR ===== -->
+<nav class="navbar" id="navbar">
+    <a href="#home" class="nav-logo">
+        <div class="nav-logo-icon">
+            <img src="skystudio_icon.png" alt="SkyStudio Icon">
+        </div>
+        <div class="nav-logo-text">Sky<em>Studio</em></div>
+    </a>
+    <ul class="nav-links">
+        <li><a href="#home"       class="nav-link active" data-section="home"      data-en="Home"       data-ar="الرئيسية">Home</a></li>
+        <li><a href="#about"      class="nav-link"        data-section="about"     data-en="About"      data-ar="عنّا">About</a></li>
+        <li><a href="#games"      class="nav-link"        data-section="games"     data-en="Games"      data-ar="الألعاب">Games</a></li>
+        <li><a href="#community"  class="nav-link"        data-section="community" data-en="Community"  data-ar="المجتمع">Community</a></li>
+        <li><a href="#developers" class="nav-link"        data-section="developers" data-en="Developers" data-ar="المطورين">Developers</a></li>
+        <li><a href="#join"       class="nav-link"        data-section="join"      data-en="Join"       data-ar="انضمام">Join</a></li>
+    </ul>
+    <div class="nav-right">
+        <div class="lang-switch">
+            <button class="lang-btn active" data-lang="en">EN</button>
+            <button class="lang-btn" data-lang="ar">AR</button>
+        </div>
+    </div>
+</nav>
+
+<!-- ===== PAGE DOTS ===== -->
+<div class="page-dots" id="pageDots">
+    <div class="page-dot active" data-section="home"       data-label="Home"></div>
+    <div class="page-dot"        data-section="carousel"   data-label="Features"></div>
+    <div class="page-dot"        data-section="about"      data-label="About"></div>
+    <div class="page-dot"        data-section="games"      data-label="Games"></div>
+    <div class="page-dot"        data-section="community"  data-label="Community"></div>
+    <div class="page-dot"        data-section="developers" data-label="Developers"></div>
+    <div class="page-dot"        data-section="join"       data-label="Join"></div>
+</div>
+
+<!-- ===== SCROLL INDICATOR ===== -->
+<div class="scroll-indicator" id="scrollIndicator">
+    <span id="scrollText" data-en="Scroll to explore" data-ar="مرر للاستكشاف">Scroll to explore</span>
+    <i class="fas fa-chevron-down"></i>
+</div>
+
+<!-- ================= SECTION 1: HERO ================= -->
+<section class="section hero-section" id="home">
+    <div class="hero-content">
+        <div class="hero-3d-wrapper" id="heroIconWrap">
+            <div class="hero-3d-icon" id="heroIcon">
+                <img src="skystudio_icon.png" alt="SkyStudio Server Icon">
+            </div>
+            <div class="hero-icon-shadow"></div>
+        </div>
+
+        <div class="hero-badge">
+            <span class="badge-pulse"></span>
+            <span data-en="29 Online Now" data-ar="29 متصل الآن">29 Online Now</span>
+        </div>
+
+        <h1 class="hero-title">
+            <span data-en="Welcome to" data-ar="مرحباً في">Welcome to</span><br>
+            <span class="grad-text">SkyStudio</span>
+        </h1>
+
+        <p class="hero-subtitle"
+           data-en="The ultimate Discord server for gamers, developers &amp; creative minds. Join our community of 286+ members and be part of something extraordinary."
+           data-ar="أفضل سيرفر ديسكورد للاعبين والمطورين والعقول الإبداعية. انضم لمجتمعنا من 286+ عضو وكن جزءاً من شيء استثنائي.">
+            The ultimate Discord server for gamers, developers &amp; creative minds. Join our community of 286+ members and be part of something extraordinary.
+        </p>
+
+        <div class="hero-stats">
+            <div class="stat-item">
+                <div class="stat-number" id="heroMembers">286</div>
+                <div class="stat-label" data-en="Members" data-ar="عضو">Members</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">29</div>
+                <div class="stat-label" data-en="Online" data-ar="متصل">Online</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">2025</div>
+                <div class="stat-label" data-en="Established" data-ar="تأسس">Established</div>
+            </div>
+        </div>
+
+        <div class="hero-cta">
+            <a href="#join" class="btn btn-primary">
+                <i class="fab fa-discord"></i>
+                <span data-en="Join Server" data-ar="انضم للسيرفر">Join Server</span>
+            </a>
+            <a href="#about" class="btn btn-secondary">
+                <span data-en="Learn More" data-ar="اعرف المزيد">Learn More</span>
+                <i class="fas fa-arrow-right" id="arrowIcon"></i>
+            </a>
+        </div>
+    </div>
+
+    <!-- Floating 3D Decorations -->
+    <div class="float-el"><i class="fas fa-gamepad"></i></div>
+    <div class="float-el"><i class="fas fa-code"></i></div>
+    <div class="float-el"><i class="fas fa-trophy"></i></div>
+    <div class="float-el"><i class="fas fa-robot"></i></div>
+</section>
+
+<!-- ================= SECTION 2: CAROUSEL ================= -->
+<section class="section carousel-section" id="carousel">
+    <span class="carousel-title" data-en="— WHAT WE OFFER —" data-ar="— ما نقدمه —">— WHAT WE OFFER —</span>
+    <div class="carousel-wrap">
+        <div class="carousel-stage" id="carouselStage"></div>
+    </div>
+</section>
+
+<!-- ================= SECTION 3: ABOUT ================= -->
+<section class="section about-section" id="about">
+    <div class="about-inner">
+        <div class="about-visual slide-left">
+            <div class="about-img-wrap">
+                <img src="skystudio_icon.png" alt="SkyStudio">
+            </div>
+        </div>
+        <div class="about-text slide-right">
+            <h2>
+                <span data-en="What is" data-ar="ما هو">What is</span>
+                <span class="red"> SkyStudio</span><span data-en="?" data-ar="؟">?</span>
+            </h2>
+            <p data-en="SkyStudio is a vibrant Discord community established in November 2025. We bring together gamers, developers, programmers, and creative enthusiasts from around the world."
+               data-ar="سكاي ستوديو هو مجتمع ديسكورد نابض بالحياة تأسس في نوفمبر 2025. نجمع بين اللاعبين والمطورين والمبرمجين والمبدعين من جميع أنحاء العالم.">
+                SkyStudio is a vibrant Discord community established in November 2025. We bring together gamers, developers, programmers, and creative enthusiasts from around the world.
+            </p>
+            <p data-en="Our server features dedicated channels for different games, programming help, project showcases, and a friendly community that supports each other's growth."
+               data-ar="يضم سيرفرنا قنوات مخصصة لألعاب مختلفة، ومساعدة في البرمجة، وعرض المشاريع، ومجتمع ودود يدعم نمو بعضهم البعض.">
+                Our server features dedicated channels for different games, programming help, project showcases, and a friendly community that supports each other's growth.
+            </p>
+            <div class="about-feats">
+                <div class="about-feat"><i class="fas fa-users"></i><span data-en="Active Community" data-ar="مجتمع نشط">Active Community</span></div>
+                <div class="about-feat"><i class="fas fa-code"></i><span data-en="Dev Support" data-ar="دعم المطورين">Dev Support</span></div>
+                <div class="about-feat"><i class="fas fa-trophy"></i><span data-en="Tournaments" data-ar="بطولات">Tournaments</span></div>
+                <div class="about-feat"><i class="fas fa-robot"></i><span data-en="Custom Bots" data-ar="بوتات مخصصة">Custom Bots</span></div>
+                <div class="about-feat"><i class="fas fa-music"></i><span data-en="Music Channels" data-ar="قنوات موسيقى">Music Channels</span></div>
+                <div class="about-feat"><i class="fas fa-shield-alt"></i><span data-en="Safe Environment" data-ar="بيئة آمنة">Safe Environment</span></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ================= SECTION 4: GAMES ================= -->
+<section class="section games-section" id="games">
+    <div style="max-width:1200px;width:100%;">
+        <div class="section-hdr fade-up">
+            <h2>
+                <span data-en="Our" data-ar="ألعابنا">Our</span>
+                <span class="red" data-en=" Games" data-ar=""> Games</span>
+            </h2>
+            <p data-en="We play everything from competitive shooters to immersive story games. Find your squad here!"
+               data-ar="نلعب كل شيء من ألعاب الرماية التنافسية إلى ألعاب القصص المغمورة. اعثر على فريقك هنا!">
+                We play everything from competitive shooters to immersive story games. Find your squad here!
+            </p>
+        </div>
+        <div class="games-grid">
+            <div class="game-card fade-up">
+                <div class="game-icon"><i class="fas fa-crosshairs"></i></div>
+                <h3 data-en="Counter-Strike" data-ar="كاونتر سترايك">Counter-Strike</h3>
+                <p data-en="Competitive CS matches, strategies, and team coordination. From CS2 to classic CS:GO, we have you covered."
+                   data-ar="مباريات كاونتر سترايك التنافسية، استراتيجيات، وتنسيق الفريق. من CS2 إلى CS:GO الكلاسيكي.">
+                    Competitive CS matches, strategies, and team coordination. From CS2 to classic CS:GO, we have you covered.
+                </p>
+                <div class="game-tags"><span class="tag">FPS</span><span class="tag">Competitive</span><span class="tag">5v5</span></div>
+            </div>
+            <div class="game-card fade-up delay-1">
+                <div class="game-icon"><i class="fas fa-cube"></i></div>
+                <h3 data-en="Roblox" data-ar="روبلوكس">Roblox</h3>
+                <p data-en="Explore infinite worlds, create your own games, or join our Roblox development team. The possibilities are endless."
+                   data-ar="استكشف عوالم لا نهائية، أنشئ ألعابك الخاصة، أو انضم إلى فريق تطوير روبلوكس الخاص بنا.">
+                    Explore infinite worlds, create your own games, or join our Roblox development team. The possibilities are endless.
+                </p>
+                <div class="game-tags"><span class="tag">Sandbox</span><span class="tag">Creative</span><span class="tag">Multiplayer</span></div>
+            </div>
+            <div class="game-card fade-up delay-2">
+                <div class="game-icon"><i class="fas fa-dragon"></i></div>
+                <h3 data-en="Story Games" data-ar="ألعاب القصص">Story Games</h3>
+                <p data-en="Resident Evil, Devil May Cry, and more immersive story-driven experiences. Share theories, walkthroughs, and fan art."
+                   data-ar="ريزدنت إيفل، ديفل ماي كراي، والمزيد من تجارب القصص المغمورة. شارك النظريات والفن.">
+                    Resident Evil, Devil May Cry, and more immersive story-driven experiences. Share theories, walkthroughs, and fan art.
+                </p>
+                <div class="game-tags"><span class="tag">Action</span><span class="tag">Horror</span><span class="tag">Adventure</span></div>
+            </div>
+            <div class="game-card fade-up">
+                <div class="game-icon"><i class="fas fa-parachute-box"></i></div>
+                <h3 data-en="Battle Royale" data-ar="باتل رويال">Battle Royale</h3>
+                <p data-en="PUBG, Fortnite, Apex Legends, and every battle royale game. Squad up and claim that Victory Royale!"
+                   data-ar="ببجي، فورتنايت، أبيكس ليجندز، وكل لعبة باتل رويال. شكل فريقك وحقق الفوز الملكي!">
+                    PUBG, Fortnite, Apex Legends, and every battle royale game. Squad up and claim that Victory Royale!
+                </p>
+                <div class="game-tags"><span class="tag">BR</span><span class="tag">Squad</span><span class="tag">Survival</span></div>
+            </div>
+            <div class="game-card fade-up delay-1">
+                <div class="game-icon"><i class="fas fa-car"></i></div>
+                <h3 data-en="Rocket League" data-ar="روكيت ليج">Rocket League</h3>
+                <p data-en="Soccer meets driving in the most addictive game ever. Join our Rocket League team for ranked matches and tournaments."
+                   data-ar="كرة القدم تلتقي بالقيادة في أكثر الألعاب إدماناً. انضم لفريقنا في المباريات والبطولات.">
+                    Soccer meets driving in the most addictive game ever. Join our Rocket League team for ranked matches and tournaments.
+                </p>
+                <div class="game-tags"><span class="tag">Sports</span><span class="tag">Cars</span><span class="tag">Ranked</span></div>
+            </div>
+            <div class="game-card fade-up delay-2">
+                <div class="game-icon"><i class="fas fa-infinity"></i></div>
+                <h3 data-en="And More..." data-ar="والمزيد...">And More...</h3>
+                <p data-en="Minecraft, Valorant, GTA, FIFA, and any game you can think of. If you play it, someone in SkyStudio plays it too!"
+                   data-ar="ماينكرافت، فالورانت، جي تي أي، فيفا، وأي لعبة يمكنك التفكير فيها. إذا لعبتها، فشخص في سكاي ستوديو يلعبها أيضاً!">
+                    Minecraft, Valorant, GTA, FIFA, and any game you can think of. If you play it, someone in SkyStudio plays it too!
+                </p>
+                <div class="game-tags"><span class="tag">All Games</span><span class="tag">Community</span></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ================= SECTION 5: COMMUNITY ================= -->
+<section class="section community-section" id="community">
+    <div style="max-width:1200px;width:100%;">
+        <div class="section-hdr fade-up">
+            <h2>
+                <span data-en="Our" data-ar="مجتمعنا">Our</span>
+                <span class="red" data-en=" Community" data-ar=""> Community</span>
+            </h2>
+            <p data-en="Numbers that speak for themselves. Join the growing SkyStudio family!"
+               data-ar="أرقام تتحدث عن نفسها. انضم إلى عائلة سكاي ستوديو المتنامية!">
+                Numbers that speak for themselves. Join the growing SkyStudio family!
+            </p>
+        </div>
+        <div class="comm-grid">
+            <div class="comm-card scale-up">
+                <div class="comm-ico"><i class="fas fa-users"></i></div>
+                <div class="comm-num" id="memberCount">286</div>
+                <div class="comm-lbl" data-en="Total Members" data-ar="إجمالي الأعضاء">Total Members</div>
+            </div>
+            <div class="comm-card scale-up delay-1">
+                <div class="comm-ico"><i class="fas fa-signal"></i></div>
+                <div class="comm-num">29</div>
+                <div class="comm-lbl" data-en="Online Now" data-ar="متصل الآن">Online Now</div>
+            </div>
+            <div class="comm-card scale-up delay-2">
+                <div class="comm-ico"><i class="fas fa-calendar-alt"></i></div>
+                <div class="comm-num">2025</div>
+                <div class="comm-lbl" data-en="Established" data-ar="سنة التأسيس">Established</div>
+            </div>
+        </div>
+        <div style="margin-top:50px;text-align:center;">
+            <p class="fade-up" style="font-size:1.05rem;color:var(--gray);max-width:700px;margin:0 auto;line-height:1.85;"
+               data-en="Our server is built on respect, fun, and growth. We have active moderators, regular events, giveaways, and a welcoming atmosphere for everyone."
+               data-ar="سيرفرنا مبني على الاحترام والمتعة والنمو. لدينا مشرفون نشطون، أحداث منتظمة، هدايا، وأجواء ترحيبية للجميع.">
+                Our server is built on respect, fun, and growth. We have active moderators, regular events, giveaways, and a welcoming atmosphere for everyone.
+            </p>
+        </div>
+    </div>
+</section>
+
+<!-- ================= SECTION 6: DEVELOPERS ================= -->
+<section class="section dev-section" id="developers">
+    <div style="max-width:1200px;width:100%;">
+        <div class="section-hdr fade-up">
+            <h2>
+                <span data-en="For" data-ar="للمطورين">For</span>
+                <span class="red" data-en=" Developers" data-ar=""> Developers</span>
+            </h2>
+            <p data-en="SkyStudio is not just for gamers. We are a hub for developers, programmers, and tech enthusiasts too!"
+               data-ar="سكاي ستوديو ليس للاعبين فقط. نحن مركز للمطورين والمبرمجين وعشاق التقنية أيضاً!">
+                SkyStudio is not just for gamers. We are a hub for developers, programmers, and tech enthusiasts too!
+            </p>
+        </div>
+        <div class="dev-grid">
+            <div class="dev-card fade-up">
+                <div class="dev-header">
+                    <div class="dev-avatar"><i class="fas fa-code"></i></div>
+                    <div class="dev-info">
+                        <h4 data-en="Programming Help" data-ar="مساعدة في البرمجة">Programming Help</h4>
+                        <span data-en="All Languages" data-ar="جميع اللغات">All Languages</span>
+                    </div>
+                </div>
+                <p data-en="Get help with Python, JavaScript, C++, Java, and any programming language. Our community includes experienced developers ready to help."
+                   data-ar="احصل على مساعدة في بايثون، جافاسكريبت، سي++، جافا، وأي لغة برمجة. يتضمن مجتمعنا مطورين ذوي خبرة جاهزين للمساعدة.">
+                    Get help with Python, JavaScript, C++, Java, and any programming language. Our community includes experienced developers ready to help.
+                </p>
+                <div class="dev-skills">
+                    <span class="skill-tag">Python</span><span class="skill-tag">JavaScript</span><span class="skill-tag">C++</span><span class="skill-tag">Java</span>
+                </div>
+            </div>
+            <div class="dev-card fade-up delay-1">
+                <div class="dev-header">
+                    <div class="dev-avatar"><i class="fas fa-gamepad"></i></div>
+                    <div class="dev-info">
+                        <h4 data-en="Game Development" data-ar="تطوير الألعاب">Game Development</h4>
+                        <span data-en="Unity, Unreal, Roblox" data-ar="يونيتي، أنريل، روبلوكس">Unity, Unreal, Roblox</span>
+                    </div>
+                </div>
+                <p data-en="Share your game projects, get feedback, collaborate with other devs, and learn game development from scratch with our tutorials."
+                   data-ar="شارك مشاريع ألعابك، احصل على ملاحظات، تعاون مع مطورين آخرين، وتعلم تطوير الألعاب من الصفر.">
+                    Share your game projects, get feedback, collaborate with other devs, and learn game development from scratch with our tutorials.
+                </p>
+                <div class="dev-skills">
+                    <span class="skill-tag">Unity</span><span class="skill-tag">Unreal</span><span class="skill-tag">Roblox Studio</span><span class="skill-tag">Godot</span>
+                </div>
+            </div>
+            <div class="dev-card fade-up delay-2">
+                <div class="dev-header">
+                    <div class="dev-avatar"><i class="fas fa-robot"></i></div>
+                    <div class="dev-info">
+                        <h4 data-en="Bot Development" data-ar="تطوير البوتات">Bot Development</h4>
+                        <span data-en="Discord Bots" data-ar="بوتات ديسكورد">Discord Bots</span>
+                    </div>
+                </div>
+                <p data-en="Create custom Discord bots for your servers. We share code, libraries, and best practices for bot development using discord.py, discord.js, and more."
+                   data-ar="أنشئ بوتات ديسكورد مخصصة لسيرفراتك. نشارك الكود، والمكتبات، وأفضل الممارسات لتطوير البوتات.">
+                    Create custom Discord bots for your servers. We share code, libraries, and best practices for bot development using discord.py, discord.js, and more.
+                </p>
+                <div class="dev-skills">
+                    <span class="skill-tag">discord.py</span><span class="skill-tag">discord.js</span><span class="skill-tag">APIs</span>
+                </div>
+            </div>
+            <div class="dev-card fade-up delay-1">
+                <div class="dev-header">
+                    <div class="dev-avatar"><i class="fas fa-globe"></i></div>
+                    <div class="dev-info">
+                        <h4 data-en="Web Development" data-ar="تطوير الويب">Web Development</h4>
+                        <span data-en="Frontend &amp; Backend" data-ar="الواجهة الأمامية والخلفية">Frontend &amp; Backend</span>
+                    </div>
+                </div>
+                <p data-en="From HTML/CSS to React, Node.js, and databases. Get help with your web projects, share portfolios, and learn modern web technologies."
+                   data-ar="من HTML/CSS إلى React و Node.js والقواعد البيانات. احصل على مساعدة في مشاريع الويب الخاصة بك.">
+                    From HTML/CSS to React, Node.js, and databases. Get help with your web projects, share portfolios, and learn modern web technologies.
+                </p>
+                <div class="dev-skills">
+                    <span class="skill-tag">React</span><span class="skill-tag">Node.js</span><span class="skill-tag">HTML/CSS</span><span class="skill-tag">Databases</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ================= SECTION 7: JOIN ================= -->
+<section class="section join-section" id="join">
+    <div class="join-content">
+        <div class="join-badge fade-up">
+            <i class="fab fa-discord"></i>
+            <span data-en="Join SkyStudio Today" data-ar="انضم إلى سكاي ستوديو اليوم">Join SkyStudio Today</span>
+        </div>
+        <h2 class="join-title fade-up">
+            <span data-en="Ready to" data-ar="مستعد">Ready to</span>
+            <span class="red" data-en=" Join?" data-ar=" للانضمام؟"> Join?</span>
+        </h2>
+        <p class="join-sub fade-up"
+           data-en="Be part of an amazing community. Click the button below to join SkyStudio on Discord!"
+           data-ar="كن جزءاً من مجتمع رائع. اضغط على الزر أدناه للانضمام إلى سكاي ستوديو على ديسكورد!">
+            Be part of an amazing community. Click the button below to join SkyStudio on Discord!
+        </p>
+        <div class="discord-card scale-up">
+            <div class="dc-banner"></div>
+            <div class="dc-body">
+                <div class="dc-icon-wrap">
+                    <img src="skystudio_icon.png" alt="SkyStudio Icon">
+                </div>
+                <div class="dc-name">SkyStudio</div>
+                <div class="dc-verified">
+                    <i class="fas fa-check-circle"></i>
+                    <span data-en="Community Server" data-ar="سيرفر مجتمعي">Community Server</span>
+                </div>
+                <div class="dc-stats">
+                    <div class="dc-stat"><span class="dot-green"></span><span>29 Online</span></div>
+                    <div class="dc-stat"><span class="dot-gray"></span><span>286 Members</span></div>
+                </div>
+                <div class="dc-est" data-en="Est. November 2025" data-ar="تأسس نوفمبر 2025">Est. November 2025</div>
+                <a href="https://discord.gg/xFSguWXVH" target="_blank" class="dc-join">
+                    <i class="fab fa-discord"></i>
+                    <span data-en="Join SkyStudio" data-ar="انضم إلى سكاي ستوديو">Join SkyStudio</span>
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer class="footer">
+    <div class="footer-logo">Sky<em>Studio</em></div>
+    <p class="footer-text" data-en="Made with passion for gamers and developers." data-ar="صنع بشغف للاعبين والمطورين.">Made with passion for gamers and developers.</p>
+    <div class="footer-socials">
+        <a href="https://discord.gg/xFSguWXVH" target="_blank"><i class="fab fa-discord"></i></a>
+        <a href="#"><i class="fab fa-youtube"></i></a>
+        <a href="#"><i class="fab fa-twitch"></i></a>
+        <a href="#"><i class="fab fa-github"></i></a>
+    </div>
+</footer>
+
+<script>
+// ============================================================
+//  THREE.JS — PARTICLE FIELD + WIREFRAME CUBES
+// ============================================================
+(function() {
+    const canvas = document.getElementById('three-canvas');
+    const scene  = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    camera.position.z = 5;
+
+    // Particles
+    const N = 900;
+    const pos = new Float32Array(N * 3);
+    const col = new Float32Array(N * 3);
+    for (let i = 0; i < N * 3; i += 3) {
+        pos[i]   = (Math.random() - 0.5) * 55;
+        pos[i+1] = (Math.random() - 0.5) * 55;
+        pos[i+2] = (Math.random() - 0.5) * 55;
+        col[i]   = 0.85 + Math.random() * 0.15;
+        col[i+1] = 0.15 + Math.random() * 0.3;
+        col[i+2] = 0.15 + Math.random() * 0.3;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({
+        size: 0.055, vertexColors: true, transparent: true,
+        opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false
+    }));
+    scene.add(pts);
+
+    // Wireframe cubes
+    const cubes = [];
+    const cubeGeo = new THREE.BoxGeometry(0.55, 0.55, 0.55);
+    for (let i = 0; i < 22; i++) {
+        const mat = new THREE.MeshBasicMaterial({ color: 0xe63946, transparent: true, opacity: 0.09, wireframe: true });
+        const cube = new THREE.Mesh(cubeGeo, mat);
+        cube.position.set((Math.random()-0.5)*32, (Math.random()-0.5)*32, (Math.random()-0.5)*20 - 8);
+        cube.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, 0);
+        cube.userData = { rx: Math.random()*0.009+0.003, ry: Math.random()*0.009+0.003, fs: Math.random()*0.002+0.001, fo: Math.random()*Math.PI*2 };
+        cubes.push(cube);
+        scene.add(cube);
+    }
+
+    let mx = 0, my = 0;
+    document.addEventListener('mousemove', e => {
+        mx = (e.clientX / innerWidth  - 0.5) * 2;
+        my = (e.clientY / innerHeight - 0.5) * 2;
+    });
+
+    function tick() {
+        requestAnimationFrame(tick);
+        pts.rotation.y += 0.0004 + mx * 0.0003;
+        pts.rotation.x += 0.00015 + my * 0.0003;
+        const t = Date.now();
+        cubes.forEach(c => {
+            c.rotation.x += c.userData.rx;
+            c.rotation.y += c.userData.ry;
+            c.position.y += Math.sin(t * c.userData.fs + c.userData.fo) * 0.008;
+        });
+        renderer.render(scene, camera);
+    }
+    tick();
+
+    window.addEventListener('resize', () => {
+        camera.aspect = innerWidth / innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(innerWidth, innerHeight);
+    });
+})();
+
+// ============================================================
+//  CAROUSEL INIT
+// ============================================================
+const carouselData = [
+    { icon: 'fa-gamepad',    title: 'Gaming',      desc: 'Compete with the best', badge: 'HOT' },
+    { icon: 'fa-code',       title: 'Development', desc: 'Code & create together', badge: 'NEW' },
+    { icon: 'fa-users',      title: 'Community',   desc: 'Make lifelong friends', badge: '' },
+    { icon: 'fa-trophy',     title: 'Tournaments', desc: 'Compete & win prizes', badge: '' },
+    { icon: 'fa-music',      title: 'Music',       desc: 'Listen & vibe together', badge: '' },
+    { icon: 'fa-robot',      title: 'Bots',        desc: 'Custom server bots', badge: '' },
+    { icon: 'fa-shield-alt', title: 'Safe Space',  desc: 'Moderated & friendly', badge: '' },
+    { icon: 'fa-infinity',   title: 'Endless Fun', desc: 'New content every week', badge: '' },
+];
+
+(function() {
+    const stage = document.getElementById('carouselStage');
+    if (!stage) return;
+    const count  = carouselData.length;
+    const step   = 360 / count;
+    const radius = 420;
+    carouselData.forEach((d, i) => {
+        const angle = (i * step) * (Math.PI / 180);
+        const x = Math.sin(angle) * radius;
+        const z = Math.cos(angle) * radius;
+        const el = document.createElement('div');
+        el.className = 'c-card';
+        el.style.transform = `translateX(${x}px) translateZ(${z}px) rotateY(${i * step}deg)`;
+        el.innerHTML = `
+            <div class="c-card-inner">
+                <div class="c-icon"><i class="fas ${d.icon}"></i></div>
+                <div class="c-title">${d.title}</div>
+                <div class="c-desc">${d.desc}</div>
+                ${d.badge ? `<div class="c-badge">${d.badge}</div>` : ''}
+            </div>`;
+        stage.appendChild(el);
+    });
+})();
+
+// ============================================================
+//  LOADING SCREEN
+// ============================================================
+setTimeout(() => { document.getElementById('loadingScreen').classList.add('hidden'); }, 2600);
+
+// ============================================================
+//  LANGUAGE SWITCHER — FIXED ARABIC TEXT BUG
+// ============================================================
+let currentLang = 'en';
+const dotLabels = {
+    en: ['Home','Features','About','Games','Community','Developers','Join'],
+    ar: ['الرئيسية','المميزات','عنّا','الألعاب','المجتمع','المطورين','انضمام']
+};
+
+document.querySelectorAll('.lang-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const lang = btn.dataset.lang;
+        if (lang === currentLang) return;
+        currentLang = lang;
+
+        document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === lang));
+        document.documentElement.setAttribute('lang', lang);
+        document.documentElement.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
+
+        // Safely update each element: use textContent (never clobber child nodes)
+        document.querySelectorAll('[data-en]').forEach(el => {
+            const val = el.getAttribute('data-' + lang);
+            if (val === null) return;
+            // Only update if element has no element children (pure text node holder)
+            if (el.children.length === 0) {
+                el.textContent = val;
+            }
+        });
+
+        // Arrow icon direction
+        const arrow = document.getElementById('arrowIcon');
+        if (arrow) {
+            arrow.style.transform = lang === 'ar' ? 'scaleX(-1)' : '';
+        }
+
+        // Update page dot labels
+        document.querySelectorAll('.page-dot').forEach((dot, i) => {
+            dot.setAttribute('data-label', dotLabels[lang][i] || '');
+        });
+
+        // Carousel title
+        const ctitle = document.querySelector('.carousel-title');
+        if (ctitle) ctitle.textContent = lang === 'ar' ? '— ما نقدمه —' : '— WHAT WE OFFER —';
+    });
+});
+
+// ============================================================
+//  NAVBAR SCROLL
+// ============================================================
+const navbar = document.getElementById('navbar');
+window.addEventListener('scroll', () => {
+    navbar.classList.toggle('scrolled', scrollY > 50);
+});
+
+// ============================================================
+//  ACTIVE NAV + PAGE DOTS ON SCROLL
+// ============================================================
+const allSections = document.querySelectorAll('.section');
+const navLinks    = document.querySelectorAll('.nav-link');
+const pageDots    = document.querySelectorAll('.page-dot');
+const scrollInd   = document.getElementById('scrollIndicator');
+
+window.addEventListener('scroll', () => {
+    let active = '';
+    allSections.forEach(s => { if (scrollY >= s.offsetTop - 220) active = s.id; });
+    navLinks.forEach(l => l.classList.toggle('active', l.dataset.section === active));
+    pageDots.forEach(d => d.classList.toggle('active', d.dataset.section === active));
+    scrollInd.style.opacity = scrollY > 120 ? '0' : '0.7';
+}, { passive: true });
+
+pageDots.forEach(dot => {
+    dot.addEventListener('click', () => {
+        const el = document.getElementById(dot.dataset.section);
+        if (el) el.scrollIntoView({ behavior: 'smooth' });
+    });
+});
+
+// ============================================================
+//  SMOOTH ANCHOR SCROLLING
+// ============================================================
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+        const target = document.querySelector(a.getAttribute('href'));
+        if (target) { e.preventDefault(); target.scrollIntoView({ behavior: 'smooth' }); }
+    });
+});
+
+// ============================================================
+//  INTERSECTION OBSERVER — SCROLL ANIMATIONS
+// ============================================================
+const ioOpts = { threshold: 0.18, rootMargin: '0px 0px -40px 0px' };
+const io = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); } });
+}, ioOpts);
+document.querySelectorAll('.fade-up,.slide-left,.slide-right,.scale-up').forEach(el => io.observe(el));
+
+// ============================================================
+//  MEMBER COUNT ANIMATION
+// ============================================================
+function countUp(el, target, duration) {
+    let start = 0;
+    const step = target / (duration / 16);
+    const run = () => {
+        start = Math.min(start + step, target);
+        el.textContent = Math.floor(start);
+        if (start < target) requestAnimationFrame(run);
+    };
+    requestAnimationFrame(run);
+}
+const countEls = document.querySelectorAll('#memberCount');
+const countIo  = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+        if (e.isIntersecting) { countUp(e.target, 286, 1400); countIo.unobserve(e.target); }
+    });
+});
+countEls.forEach(el => countIo.observe(el));
+
+// ============================================================
+//  3D TILT EFFECT ON CARDS
+// ============================================================
+document.querySelectorAll('.game-card,.comm-card,.dev-card').forEach(card => {
+    card.addEventListener('mousemove', e => {
+        const r = card.getBoundingClientRect();
+        const x = e.clientX - r.left, y = e.clientY - r.top;
+        const cx = r.width / 2, cy = r.height / 2;
+        const rx = ((y - cy) / cy) * 9;
+        const ry = ((cx - x) / cx) * 9;
+        card.style.transform = `perspective(1000px) rotateX(${rx}deg) rotateY(${ry}deg) translateY(-8px)`;
+        card.style.boxShadow = `0 20px 50px rgba(0,0,0,0.45), 0 0 30px rgba(230,57,70,0.12)`;
+    });
+    card.addEventListener('mouseleave', () => {
+        card.style.transform = '';
+        card.style.boxShadow = '';
+        card.style.transition = 'transform 0.5s ease, box-shadow 0.5s ease';
+        setTimeout(() => { card.style.transition = ''; }, 500);
+    });
+});
+
+// ============================================================
+//  HERO ICON MOUSE PARALLAX
+// ============================================================
+(function() {
+    const wrap = document.getElementById('heroIconWrap');
+    if (!wrap) return;
+    let tx = 0, ty = 0, cx = 0, cy = 0;
+    document.addEventListener('mousemove', e => {
+        tx = (e.clientX / innerWidth  - 0.5) * 22;
+        ty = (e.clientY / innerHeight - 0.5) * 22;
+    });
+    function lerp(a, b, t) { return a + (b - a) * t; }
+    function frame() {
+        cx = lerp(cx, tx, 0.06);
+        cy = lerp(cy, ty, 0.06);
+        wrap.style.transform = `translate(${cx}px, ${cy}px)`;
+        requestAnimationFrame(frame);
+    }
+    frame();
+})();
+</script>
+</body>
+</html>
